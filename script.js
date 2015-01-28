@@ -5,7 +5,8 @@
  */
 
 var MAX_RESULTS = 9
-var APPLICATION = "Messages"
+var APP_messages = "Messages"
+var APP_contacts = "Contacts"
 var MESSAGES_URL = "imessage:\/\/"
 
 /**
@@ -15,8 +16,49 @@ var MESSAGES_URL = "imessage:\/\/"
  * @type String
  */
 function run(arg) {
-    var app = Application(APPLICATION);
-    return lookup_buddies(app, arg);
+    var app_msgs = Application(APP_messages);
+    var app_ctcs = Application(APP_contacts) 
+    return lookup_buddies(app_msgs, app_ctcs, arg);
+}
+
+
+function buddy(handle, name) {
+	this.handle = handle
+	this.name = name
+}
+
+/**
+*/
+function lookup_buddies(messages, contacts, query){
+	var result = "<?xml version=\"1.0\"?>\n";
+    
+    var matching_buddies = messages.buddies.whose(
+        { _or: [ 
+           { name: { _contains: query } },
+           { fullName: { _contains: query } },
+           { handle: { _contains: query } }
+           ] 
+       }, { ignoring: ['case']});
+    
+    var handles = uniq(matching_buddies.handle());
+    
+    result += "<items>\n";
+
+    if (handles.length > 0) {
+        for (var ih = 0; ih < MAX_RESULTS && ih < handles.length ; ih++) {
+            selected_buddy = matching_buddies.whose({ handle: handles[ih] })[0];
+            
+            if (selected_buddy.service.serviceType() === 'iMessage') {
+                result += handle_buddy(selected_buddy);
+            }
+        }
+    } else {
+        result += handle_unknown(query);
+    }
+
+    result += "</items>";
+
+    return result
 }
 
 
@@ -52,42 +94,4 @@ function handle_buddy(buddy) {
 
 function handle_unknown(unknown) {
     return build_item_xml([unknown, unknown, "Type complete contact address or phone number"]);
-}
-
-function lookup_buddies(messages, query){
-	var result = "<?xml version=\"1.0\"?>\n";
-    
-    // var stevens = messages.buddies.whose(
-    //     {_match: [name,'Steven Op de beeck']}
-    // )
-    
-    var matching_buddies = messages.buddies.whose(
-        { _or: [ 
-           { name: { _contains: query } },
-           { fullName: { _contains: query } },
-           { handle: { _contains: query } }
-           ] 
-       }, { ignoring: ['case']});
-    
-    var handles = uniq(matching_buddies.handle());
-    
-    result += "<items>\n";
-
-    if (handles.length > 0) {
-        
-        for (var ih = 0; ih < MAX_RESULTS && ih < handles.length ; ih++) {
-            selected_buddy = matching_buddies.whose({ handle: handles[ih]})[0];
-            
-            if (selected_buddy.service.serviceType() == 'iMessage') {
-                result += handle_buddy(selected_buddy);
-            }
-        }
-
-    } else {
-        result += handle_unknown(query);
-    }
-
-    result += "</items>";
-
-    return result
 }
