@@ -141,7 +141,7 @@ function _lookup_buddies_messages(query, app){
            { fullName: { _beginsWith: query } },
            { firstName: { _beginsWith: query } },
            { lastName: { _beginsWith: query } },
-           { handle: { _beginsWith: query } }
+           { handle: { _contains: query } }
            ] 
        }, { ignoring: ['case']});
     
