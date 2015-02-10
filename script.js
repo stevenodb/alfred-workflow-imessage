@@ -4,14 +4,16 @@
  * @version 1
  */
 
-var MAX_RESULTS = 9
-var APP_messages = "Messages"
-var APP_contacts = "Contacts"
-var MESSAGES_URL = "imessage:\/\/"
-var IMESSAGE_STYPE = "iMessage"
-var UNKOWN_MSG = "Type complete contact address or phone number"
-var UNKNOWN_BUDDY = function(query) { return new Buddyitem(UNKOWN_MSG, query); }
-
+MAX_RESULTS = 9
+APP_messages = "Messages"
+APP_contacts = "Contacts"
+SYS_EVENTS = "System Events"
+MESSAGES_URL = "imessage:\/\/"
+IMESSAGE_STYPE = "iMessage"
+UNKOWN_MSG = "Type complete contact address or phone number"
+UNKNOWN_BUDDY = function(query) {
+	return new BuddyItem(query, query, UNKOWN_MSG);
+}
 
 /**
  * Returns an array containing the unique elements from the input array
@@ -22,29 +24,38 @@ var UNKNOWN_BUDDY = function(query) { return new Buddyitem(UNKOWN_MSG, query); }
  * @type Array
  */
 function uniq(arr, prop) {
-    var seen = {};
-    return arr.filter(
-        function(elem) {
-        	var key = (prop == undefined) ? elem : elem[prop];
-            return seen.hasOwnProperty(key) ? false : (seen[key] = true);
-        });
+	var seen = {};
+	return arr.filter(
+		function(elem) {
+			var key = (prop === undefined) ? elem : elem[prop];
+			return seen.hasOwnProperty(key) ? false : (seen[key] = true);
+		});
 }
 
 
 /**
-*/
-function Buddyitem(handle, name) {
-	this.handle = handle
-	this.name = name
+ * BuddyItem class represents a buddy with its handle, name and an 
+ * optional description.
+ * @param {String} handle - the handle
+ * @param {String} name — the name
+ * @param {optional String} description – optional description
+ */
+function BuddyItem(handle, name, description) {
+	this.handle = handle;
+	this.name = name;
+	this.description = description;
 }
 
-Buddyitem.prototype.to_xml = function(){
+/**
+ * Output function for XML
+ */
+BuddyItem.prototype.to_xml = function() {
 	var result = "\t<item";
 	result += " uid=\"" + this.handle + "\"";
 	result += " arg=\"" + MESSAGES_URL + this.handle + "\"";
 	result += ">\n";
     result += "\t\t<title>" + this.name + "</title>\n";
-    result += "\t\t<subtitle>" + this.handle + "</subtitle>\n";
+    result += "\t\t<subtitle>" + ((this.description === undefined) ? this.handle : this.description) + "</subtitle>\n";
     result += "\t</item>\n";
     return result;
 };
@@ -52,20 +63,37 @@ Buddyitem.prototype.to_xml = function(){
 
 /**
  * Script run-handler
- * @param {String} arg The query
+ * @param {String} query The search query
  * @returns iMessage buddies that satisfy the query (Alfred XML structure)
  * @type String
  */
 function run(query) {
+	var sys_events = Application(SYS_EVENTS)
+	// APP_ctcs_running = sys_events.processes.whose({ name: APP_contacts }).length > 0;
+
     var app_msgs = Application(APP_messages);
-    var app_ctcs = Application(APP_contacts);
-    matching_buddyitems = lookup_buddies(app_msgs, app_ctcs, query);
-    matching_buddyitems = matching_buddyitems.slice(0,MAX_RESULTS)
-    return build_xml(matching_buddyitems, query)
+    var app_ctcs = null;
+    // var app_ctcs = Application(APP_contacts);
+
+    matching_buddyitems = _lookup_buddies(query, app_msgs);
+
+    if (matching_buddyitems.length > MAX_RESULTS) { 
+    	matching_buddyitems = matching_buddyitems.slice(0,MAX_RESULTS)
+    }
+
+    // if (!APP_ctcs_running) Application(APP_contacts).quit();
+
+    return _build_xml(matching_buddyitems, query)
 }
 
-
-function build_xml(buddyitems, query) {
+/**
+ * Function that builds an Alfred XML string
+ * @param {Array.<BuddyItem>} buddyitems - a list of buddyitem objects
+ * @param {String} query - the query
+ * @returns a string in XML format
+ * @private
+ */
+function _build_xml(buddyitems, query) {
 	var result = "<?xml version=\"1.0\"?>\n";
 	result += "<items>\n";
 
@@ -83,27 +111,37 @@ function build_xml(buddyitems, query) {
 	return result;
 }
 
-
-function lookup_buddies(messages, contacts, query) {
-	var matching_in_msg = lookup_buddies_messages(messages, query);
-	console.log("msg");
-	var matching_in_cts = lookup_buddies_contacts(contacts, query);
-	console.log("cts");
-	var matching_items = matching_in_msg.concat(matching_in_cts);
+/**
+* Look up and combine buddies from various apps
+* @param {String} query - the search string
+* @param {Application} messages - the messages app
+* @returns an array of matching BuddyItem objects
+*/
+function _lookup_buddies(query, messages) {
+	var matching_items = []
+	matching_items = matching_items.concat(_lookup_buddies_messages(query, messages));
+	// matching_items = matching_items.concat(_lookup_buddies_contacts(contacts, query));
 
 	return uniq(matching_items, 'handle');
 }
 
 /**
+* Look up buddies in the Message app.
+* @param {String} query - the search string
+* @param {Application} messages - the messages app
+* @returns an array of matching BuddyItem objects
+* @type Array.<BuddyItem>
 */
-function lookup_buddies_messages(app, query){
+function _lookup_buddies_messages(query, app){
 	var result = []
-    
+
     var matching_buddies = app.buddies.whose(
         { _or: [ 
-           { name: { _contains: query } },
-           { fullName: { _contains: query } },
-           { handle: { _contains: query } }
+           { name: { _beginsWith: query } },
+           { fullName: { _beginsWith: query } },
+           { firstName: { _beginsWith: query } },
+           { lastName: { _beginsWith: query } },
+           { handle: { _beginsWith: query } }
            ] 
        }, { ignoring: ['case']});
     
@@ -114,7 +152,7 @@ function lookup_buddies_messages(app, query){
 	        sel_buddy = matching_buddies.whose({ handle: element })[0];
     
 	        if (sel_buddy.service.serviceType() === IMESSAGE_STYPE) {
-	            var item = new Buddyitem(sel_buddy.handle(),sel_buddy.name())
+	            var item = new BuddyItem(sel_buddy.handle(),sel_buddy.name())
 	            result.push(item)
 	        }
 	    }
@@ -123,48 +161,27 @@ function lookup_buddies_messages(app, query){
     return result
 }
 
-function lookup_buddies_contacts(app, query) {
+// removed, because too slow
+// function _lookup_buddies_contacts(app, query) {
 
-	var result = []
-	
-	var matching_buddies = app.people.whose(
-	{ _or: [
-		{ name: { _contains: query } },
-		{ nickname: { _contains: query } }
-		]
-	}, { ignoring: ['case']});
+// 	var result = []
 
-	var ids = matching_buddies.id();
+// 	var matching_contacts = app.people.whose(
+// 	{ _or: [
+// 		{ firstName: { _beginsWith: query } },
+// 		{ lastName: { _beginsWith: query } },
+// 		{ nickname: { _beginsWith: query } },
+// 		// { _match: [ phones, query ] }
+// 		]
+// 	}, { ignoring: ['case']});
 
-	for (var i = 0; i < MAX_RESULTS && i < ids.length ; i++) {
-		// there is one, and only one.
-		sel_buddy = matching_buddies.whose({ id: ids[i] })[0];
+// 	matching_contacts().forEach(
+// 		function(contact, index) {
+// 			contact.phones().forEach(function(phone, index){
+// 				var val = phone.value().replace(/\s+/g, '');
+// 				result.push(new BuddyItem(val, contact.name() + " (contacts)"))			
+// 			});
+// 		});
 
-		sel_buddy.phones().forEach(
-			function(element, index){
-				var val = element.value().replace(/\s+/g, '');
-				result.push(new Buddyitem(val, sel_buddy.name()))				
-		});
-	}
-
-	return result
-}
-
-// function build_item_xml(arr) {
-//     var result = "\t<item";
-// 	result += " uid=\"" + arr[0] + "\"";
-// 	result += " arg=\"" + MESSAGES_URL + arr[0] + "\"";
-// 	result += ">\n";
-//     result += "\t\t<title>" + arr[1] + "</title>\n";
-//     result += "\t\t<subtitle>" + arr[2] + "</subtitle>\n";
-//     result += "\t</item>\n";
-//     return result;
-// }
-
-// function handle_buddy(buddy) {
-//     return build_item_xml([buddy.handle(), buddy.name(), buddy.handle()]);
-// }
-
-// function handle_unknown(unknown) {
-//     return build_item_xml([unknown, unknown, "Type complete contact address or phone number"]);
+// 	return result
 // }
