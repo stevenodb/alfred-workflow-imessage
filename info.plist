@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>bundleid</key>
-	<string>org.opdebeeck.alfred.messages</string>
+	<string>co.leftblank.alfred.messages</string>
 	<key>category</key>
 	<string>Internet</string>
 	<key>connections</key>
@@ -23,7 +23,7 @@
 	<key>createdby</key>
 	<string>Steven Op de beeck</string>
 	<key>description</key>
-	<string></string>
+	<string>Alfred plugin for buddy completion from iMessage app</string>
 	<key>disabled</key>
 	<false/>
 	<key>name</key>
@@ -84,7 +84,7 @@
 		</dict>
 	</array>
 	<key>readme</key>
-	<string></string>
+	<string>This plugin is keyword triggered and will use your (partial) input argument to match iMessage buddies from the Messages app. The script will match on buddy properties such as firstname, lastname, full name, handle. The matched buddies are shown in a list. Selecting one will open the Messages app with his/her conversation window active.</string>
 	<key>uidata</key>
 	<dict>
 		<key>35715EF9-9BA8-4B94-AA26-042AE6AAC3BB</key>
