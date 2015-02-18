@@ -1,13 +1,11 @@
 /**
  * Alfred iMessage buddy filter script
  * @author Steven Op de beeck <steven@opdebeeck.org>
- * @version 1
+ * @version 2
  */
 
 MAX_RESULTS = 9
 APP_messages = "Messages"
-APP_contacts = "Contacts"
-SYS_EVENTS = "System Events"
 MESSAGES_URL = "imessage:\/\/"
 IMESSAGE_STYPE = "iMessage"
 UNKOWN_MSG = "Type complete contact address or phone number"
@@ -68,20 +66,14 @@ BuddyItem.prototype.to_xml = function() {
  * @type String
  */
 function run(query) {
-	var sys_events = Application(SYS_EVENTS)
-	// APP_ctcs_running = sys_events.processes.whose({ name: APP_contacts }).length > 0;
-
     var app_msgs = Application(APP_messages);
     var app_ctcs = null;
-    // var app_ctcs = Application(APP_contacts);
 
     matching_buddyitems = _lookup_buddies(query, app_msgs);
 
     if (matching_buddyitems.length > MAX_RESULTS) { 
     	matching_buddyitems = matching_buddyitems.slice(0,MAX_RESULTS)
     }
-
-    // if (!APP_ctcs_running) Application(APP_contacts).quit();
 
     return _build_xml(matching_buddyitems, query)
 }
@@ -120,8 +112,6 @@ function _build_xml(buddyitems, query) {
 function _lookup_buddies(query, messages) {
 	var matching_items = []
 	matching_items = matching_items.concat(_lookup_buddies_messages(query, messages));
-	// matching_items = matching_items.concat(_lookup_buddies_contacts(contacts, query));
-
 	return uniq(matching_items, 'handle');
 }
 
@@ -160,28 +150,3 @@ function _lookup_buddies_messages(query, app){
 
     return result
 }
-
-// removed, because too slow
-// function _lookup_buddies_contacts(app, query) {
-
-// 	var result = []
-
-// 	var matching_contacts = app.people.whose(
-// 	{ _or: [
-// 		{ firstName: { _beginsWith: query } },
-// 		{ lastName: { _beginsWith: query } },
-// 		{ nickname: { _beginsWith: query } },
-// 		// { _match: [ phones, query ] }
-// 		]
-// 	}, { ignoring: ['case']});
-
-// 	matching_contacts().forEach(
-// 		function(contact, index) {
-// 			contact.phones().forEach(function(phone, index){
-// 				var val = phone.value().replace(/\s+/g, '');
-// 				result.push(new BuddyItem(val, contact.name() + " (contacts)"))			
-// 			});
-// 		});
-
-// 	return result
-// }
